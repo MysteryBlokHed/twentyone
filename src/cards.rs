@@ -86,13 +86,33 @@ pub fn draw_card(deck: &mut Vec<[char; 2]>) -> Result<[char; 2], ()> {
     }
 }
 
+/// Hit an amount of cards from a source to a target (eg. a shoe to a hand)
+///
+/// # Arguments
+///
+/// * `source` - The source to draw the card from
+/// * `target` - The target to place the card in
+///
+/// # Examples
+///
+/// ```
+/// use twentyone::cards;
+/// let mut shoe = cards::create_shoe(6);
+/// let mut hand = Vec::new();
+/// cards::hit_card(&mut shoe, &mut hand);
+/// ```
+pub fn hit_card(source: &mut Vec<[char; 2]>, target: &mut Vec<[char; 2]>) {
+    let card = draw_card(source).unwrap();
+    target.push(card);
+}
+
 // --- Tests ---
 #[cfg(test)]
 mod tests {
     use crate::cards;
 
     #[test]
-    fn card_tests() {
+    fn deck_tests() {
         // -- Deck --
         let mut deck = cards::create_deck();
         cards::shuffle_deck(&mut deck);
@@ -101,8 +121,10 @@ mod tests {
         assert_eq!(cards::draw_card(&mut deck).unwrap(), card);
         // Ensure that the vector length has been reduced from 52 to 51
         assert_eq!(deck.len(), 51);
+    }
 
-        // -- Shoe --
+    #[test]
+    fn shoe_tests() {
         let mut shoe = cards::create_shoe(6);
         cards::shuffle_deck(&mut shoe);
         let card = shoe.get(0).unwrap().clone();
@@ -110,5 +132,16 @@ mod tests {
         assert_eq!(cards::draw_card(&mut shoe).unwrap(), card);
         // Ensure that the vector length has been reduced from 312 to 311
         assert_eq!(shoe.len(), 311);
+    }
+
+    #[test]
+    fn hand_tests() {
+        let mut deck = cards::create_deck();
+        cards::shuffle_deck(&mut deck);
+        let mut hand: Vec<[char; 2]> = Vec::new();
+        let card = deck.get(0).unwrap().clone();
+        // Hit card from deck to hand
+        cards::hit_card(&mut deck, &mut hand);
+        assert_eq!(card, hand[0]);
     }
 }
