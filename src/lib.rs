@@ -7,3 +7,6 @@
  *
  *     http://www.apache.org/licenses/LICENSE-2.0
  */
+#![crate_name = "twentyone"]
+
+pub mod cards;
