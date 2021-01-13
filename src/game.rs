@@ -1,8 +1,19 @@
+use crate::cards;
+
+/// Actions a player can perform
+pub enum PlayerAction {
+    Hit,
+    Stand,
+    DoubleDown,
+    Split,
+}
+
 /// Describes a blackjack dealer
-pub struct Dealer {
+pub struct Dealer<'a> {
     hand: Vec<[char; 2]>,
     shoe: Vec<[char; 2]>,
     players: Vec<Player>,
+    on_action: &'a dyn Fn(&Player, &Vec<[char; 2]>) -> PlayerAction,
 }
 
 /// Describes a blackjack player
@@ -11,7 +22,7 @@ pub struct Player {
     hands: Vec<Vec<[char; 2]>>,
 }
 
-impl Dealer {
+impl Dealer<'_> {
     /// Returns a new Dealer
     ///
     /// # Arguments
@@ -26,69 +37,76 @@ impl Dealer {
     /// let shoe = cards::create_shoe();
     /// let dealer = Dealer::new(shoe);
     /// ```
-    pub fn dealer(shoe: Vec<[char; 2]>) -> Dealer {
+    pub fn new<'a>(
+        shoe: Vec<[char; 2]>,
+        on_action: &'a dyn Fn(&Player, &Vec<[char; 2]>) -> PlayerAction,
+    ) -> Dealer<'a> {
         Dealer {
             hand: Vec::new(),
             shoe: shoe,
             players: Vec::new(),
+            on_action: on_action,
         }
     }
 
     /// Returns a reference to the dealer's hand
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use twentyone::cards;
-    /// use twentyone::game::Dealer;
-    /// let shoe = cards::create_shoe();
-    /// let dealer = Dealer::new(shoe);
-    /// let hand = dealer.hand();
-    /// ```
     pub fn hand(&self) -> &Vec<[char; 2]> {
         &self.hand
     }
 
     /// Returns a reference to the dealer's shoe
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use twentyone::cards;
-    /// use twentyone::game::Dealer;
-    /// let shoe = cards::create_shoe();
-    /// let dealer = Dealer::new(shoe);
-    /// let shoe = dealer.shoe();
-    /// ```
     pub fn shoe(&self) -> &Vec<[char; 2]> {
         &self.shoe
     }
 
     /// Returns a reference to the dealer's players
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use twentyone::cards;
-    /// use twentyone::game::Dealer;
-    /// let shoe = cards::create_shoe();
-    /// let dealer = Dealer::new(shoe);
-    /// let players = dealer.players();
-    /// ```
     pub fn players(&self) -> &Vec<Player> {
         &self.players
     }
-
+    /// Returns a mutable reference to the dealer's hand
     pub fn hand_mut(&mut self) -> &mut Vec<[char; 2]> {
         &mut self.hand
     }
 
+    /// Returns a mutable reference to the dealer's shoe
     pub fn shoe_mut(&mut self) -> &mut Vec<[char; 2]> {
         &mut self.shoe
     }
 
+    /// Returns a mutable reference to the dealer's players
     pub fn players_mut(&mut self) -> &mut Vec<Player> {
         &mut self.players
+    }
+
+    /// Clear the dealer's and all players' hands
+    pub fn clear_table(&mut self) {
+        self.hand.clear();
+        for player in self.players.iter_mut() {
+            player.hands_mut().clear();
+        }
+    }
+
+    /// Deal a hand to all players
+    pub fn deal_hands(&mut self) {
+        // Dealer's hand
+        cards::hit_card(&mut self.shoe, &mut self.hand);
+        cards::hit_card(&mut self.shoe, &mut self.hand);
+
+        // Players' hands
+        for player in self.players.iter_mut() {
+            cards::hit_card(&mut self.shoe, &mut player.hands_mut()[0]);
+            cards::hit_card(&mut self.shoe, &mut player.hands_mut()[0]);
+        }
+    }
+
+    /// Hit a card to a player
+    ///
+    /// # Arguments
+    ///
+    /// * `player` - The index of the player to hit
+    /// * `hand` - The index of the player's hand (used for split hands)
+    pub fn hit_card(&mut self, player: usize, hand: usize) {
+        cards::hit_card(&mut self.shoe, &mut self.players[player].hands[hand]);
     }
 }
 
@@ -114,14 +132,6 @@ impl Player {
     }
 
     /// Returns a reference to the player's money
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use twentyone::game::Player;
-    /// let player = Player::new(100);
-    /// assert_eq!(*player.money(), 100);
-    /// ```
     pub fn money(&self) -> &i32 {
         &self.money
     }
@@ -132,15 +142,6 @@ impl Player {
     }
 
     /// Returns a mutable reference to the player's money
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use twentyone::game::Player;
-    /// let mut player = Player::new(100);
-    /// *player.money_mut() = 500;
-    /// assert_eq!(*player.money(), 500);
-    /// ```
     pub fn money_mut(&mut self) -> &mut i32 {
         &mut self.money
     }
@@ -234,6 +235,7 @@ pub fn can_split(hand: &Vec<[char; 2]>) -> bool {
 // --- Tests ---
 #[cfg(test)]
 mod tests {
+    use crate::game::{Dealer, Player, PlayerAction};
     use crate::{cards, game};
 
     #[test]
@@ -249,5 +251,29 @@ mod tests {
         cards::hit_card(&mut deck, &mut hand);
         // Test hand splitting checks
         assert_eq!(game::can_split(&hand), hand[0][1] == hand[1][1]);
+    }
+
+    #[test]
+    fn player_dealer_tests() {
+        fn on_action(_: &Player, hand: &Vec<[char; 2]>) -> PlayerAction {
+            let value = game::get_hand_value(hand, true);
+            if value < 17 {
+                PlayerAction::Hit
+            } else {
+                PlayerAction::Stand
+            }
+        }
+
+        let mut shoe = cards::create_shoe(6);
+        cards::shuffle_deck(&mut shoe);
+        let mut dealer = Dealer::new(shoe, &on_action);
+        // Mutable reference to players vector
+        let players = dealer.players_mut();
+
+        let player = Player::new(1000);
+        players.push(player);
+
+        // Deal hands
+        dealer.deal_hands();
     }
 }
