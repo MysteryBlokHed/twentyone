@@ -27,15 +27,30 @@ impl Dealer<'_> {
     ///
     /// # Arguments
     ///
-    /// * `shoe` - The shoe (or decck) to draw from
+    /// * `shoe` - The shoe (or deck) to draw from
+    /// * `on_action` - A function to handle player turns
+    ///
+    /// `on_action` gets passed a reference to the active player, and a
+    /// reference to the active hand.
     ///
     /// # Examples
     ///
     /// ```
     /// use twentyone::cards;
-    /// use twentyone::game::Dealer;
-    /// let shoe = cards::create_shoe();
-    /// let dealer = Dealer::new(shoe);
+    /// use twentyone::game;
+    /// use twentyone::game::{Dealer, Player, PlayerAction};
+    ///
+    /// fn on_action(_: &Player, hand: &Vec<[char; 2]>) -> PlayerAction {
+    ///     let value = game::get_hand_value(hand, true);
+    ///     if value < 17 {
+    ///         PlayerAction::Hit
+    ///     } else {
+    ///         PlayerAction::Stand
+    ///     }
+    /// }
+    ///
+    /// let shoe = cards::create_shoe(6);
+    /// let dealer = Dealer::new(shoe, &on_action);
     /// ```
     pub fn new<'a>(
         shoe: Vec<[char; 2]>,
@@ -83,6 +98,7 @@ impl Dealer<'_> {
         self.hand.clear();
         for player in self.players.iter_mut() {
             player.hands_mut().clear();
+            player.hands_mut().push(Vec::new());
         }
     }
 
@@ -127,7 +143,7 @@ impl Player {
     pub fn new(money: i32) -> Player {
         Player {
             money: money,
-            hands: Vec::new(),
+            hands: vec![Vec::new()],
         }
     }
 
