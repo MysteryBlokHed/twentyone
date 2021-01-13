@@ -113,7 +113,6 @@ mod tests {
 
     #[test]
     fn deck_tests() {
-        // -- Deck --
         let mut deck = cards::create_deck();
         cards::shuffle_deck(&mut deck);
         let card = deck.get(0).unwrap().clone();
