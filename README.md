@@ -1,11 +1,11 @@
-<center>
-    <h1>twentyone</h1>
-    <!-- Shields.io Badges -->
+<h1 align="center">twentyone</h1>
+<!-- Shields.io Badges -->
+<p align="center">
     <a href="https://crates.io/crates/twentyone"><img src="https://img.shields.io/crates/v/twentyone?style=flat-square"></a>
     <a href="#license"><img src="https://img.shields.io/github/license/MysteryBlokHed/twentyone?style=flat-square"></a>
-    <!-- End of Badges -->
-    <p>A blackjack engine for Rust.</p>
-</center>
+</p>
+<!-- End of Badges -->
+<p align="center">A blackjack engine for Rust.</p>
 
 ## License
 
