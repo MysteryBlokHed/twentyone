@@ -1,11 +1,17 @@
 use crate::cards;
 
 /// Actions a player can perform
-pub enum PlayerAction {
+pub enum GameAction {
     Hit,
     Stand,
     DoubleDown,
     Split,
+}
+
+/// Requests for the player
+pub enum PlayerAction {
+    Bet,
+    Play,
 }
 
 /// Describes a blackjack dealer
@@ -13,7 +19,7 @@ pub struct Dealer<'a> {
     hand: Vec<[char; 2]>,
     shoe: Vec<[char; 2]>,
     players: Vec<Player>,
-    on_action: &'a dyn Fn(&Player, &Vec<[char; 2]>) -> PlayerAction,
+    on_action: &'a dyn Fn(&Player, &Vec<[char; 2]>) -> GameAction,
 }
 
 /// Describes a blackjack player
@@ -38,14 +44,14 @@ impl Dealer<'_> {
     /// ```
     /// use twentyone::cards;
     /// use twentyone::game;
-    /// use twentyone::game::{Dealer, Player, PlayerAction};
+    /// use twentyone::game::{Dealer, Player, GameAction};
     ///
-    /// fn on_action(_: &Player, hand: &Vec<[char; 2]>) -> PlayerAction {
+    /// fn on_action(_: &Player, hand: &Vec<[char; 2]>) -> GameAction {
     ///     let value = game::get_hand_value(hand, true);
     ///     if value < 17 {
-    ///         PlayerAction::Hit
+    ///         GameAction::Hit
     ///     } else {
-    ///         PlayerAction::Stand
+    ///         GameAction::Stand
     ///     }
     /// }
     ///
@@ -54,8 +60,8 @@ impl Dealer<'_> {
     /// ```
     pub fn new<'a>(
         shoe: Vec<[char; 2]>,
-        on_action: &'a dyn Fn(&Player, &Vec<[char; 2]>) -> PlayerAction,
-    ) -> Dealer<'a> {
+        on_action: &'a dyn Fn(&Player, &Vec<[char; 2]>) -> GameAction,
+    ) -> Dealer {
         Dealer {
             hand: Vec::new(),
             shoe: shoe,
@@ -251,7 +257,7 @@ pub fn can_split(hand: &Vec<[char; 2]>) -> bool {
 // --- Tests ---
 #[cfg(test)]
 mod tests {
-    use crate::game::{Dealer, Player, PlayerAction};
+    use crate::game::{Dealer, GameAction, Player};
     use crate::{cards, game};
 
     #[test]
@@ -271,12 +277,12 @@ mod tests {
 
     #[test]
     fn player_dealer_tests() {
-        fn on_action(_: &Player, hand: &Vec<[char; 2]>) -> PlayerAction {
+        fn on_action(_: &Player, hand: &Vec<[char; 2]>) -> GameAction {
             let value = game::get_hand_value(hand, true);
             if value < 17 {
-                PlayerAction::Hit
+                GameAction::Hit
             } else {
-                PlayerAction::Stand
+                GameAction::Stand
             }
         }
 
