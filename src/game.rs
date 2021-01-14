@@ -1,17 +1,18 @@
 use crate::cards;
 
 /// Actions a player can perform
-pub enum GameAction {
+pub enum PlayerAction {
     Hit,
     Stand,
     DoubleDown,
     Split,
+    Bet(i32),
 }
 
 /// Requests for the player
-pub enum PlayerAction {
+pub enum PlayerRequest {
     Bet,
-    Play,
+    Play(usize),
 }
 
 /// Describes a blackjack dealer
@@ -19,7 +20,7 @@ pub struct Dealer<'a> {
     hand: Vec<[char; 2]>,
     shoe: Vec<[char; 2]>,
     players: Vec<Player>,
-    on_action: &'a dyn Fn(&Player, &Vec<[char; 2]>) -> GameAction,
+    on_action: &'a dyn Fn(PlayerRequest, &Player) -> PlayerAction,
 }
 
 /// Describes a blackjack player
@@ -44,14 +45,20 @@ impl Dealer<'_> {
     /// ```
     /// use twentyone::cards;
     /// use twentyone::game;
-    /// use twentyone::game::{Dealer, Player, GameAction};
+    /// use twentyone::game::{Dealer, Player, PlayerAction, PlayerRequest};
     ///
-    /// fn on_action(_: &Player, hand: &Vec<[char; 2]>) -> GameAction {
-    ///     let value = game::get_hand_value(hand, true);
-    ///     if value < 17 {
-    ///         GameAction::Hit
+    /// fn on_action(request: PlayerRequest, player: &Player) -> PlayerAction {
+    ///     if let PlayerRequest::Bet = request {
+    ///         PlayerAction::Bet(10)
+    ///     } else if let PlayerRequest::Play(i) = request {
+    ///         let value = game::get_hand_value(&player.hands()[i], true);
+    ///         if value < 17 {
+    ///          PlayerAction::Hit
+    ///         } else {
+    ///             PlayerAction::Stand
+    ///         }
     ///     } else {
-    ///         GameAction::Stand
+    ///         PlayerAction::Stand
     ///     }
     /// }
     ///
@@ -60,7 +67,7 @@ impl Dealer<'_> {
     /// ```
     pub fn new<'a>(
         shoe: Vec<[char; 2]>,
-        on_action: &'a dyn Fn(&Player, &Vec<[char; 2]>) -> GameAction,
+        on_action: &'a dyn Fn(PlayerRequest, &Player) -> PlayerAction,
     ) -> Dealer {
         Dealer {
             hand: Vec::new(),
@@ -129,6 +136,93 @@ impl Dealer<'_> {
     /// * `hand` - The index of the player's hand (used for split hands)
     pub fn hit_card(&mut self, player: usize, hand: usize) {
         cards::hit_card(&mut self.shoe, &mut self.players[player].hands[hand]);
+    }
+
+    /// Play a round of blackjack
+    ///
+    /// # Arguments
+    ///
+    /// * `clear_table` - Clear the table at the beginning of the round
+    /// * `stand_17` - `true` if the dealer should stand on soft 17,
+    /// `false` if the dealer should hit
+    pub fn play_round(&mut self, clear_table: bool, stand_17: bool) {
+        if clear_table {
+            self.clear_table();
+        }
+
+        let mut player_bets: Vec<i32> = Vec::new();
+
+        // Get bets
+        for player in self.players.iter_mut() {
+            loop {
+                let bet = (self.on_action)(PlayerRequest::Bet, player);
+                if let PlayerAction::Bet(amount) = bet {
+                    // Check if player can afford bet
+                    if *player.money() >= amount {
+                        player_bets.push(amount);
+                        *player.money_mut() -= amount;
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Get player moves
+        for i in 0..self.players.len() {
+            // Check if player has enough money to double down
+            let mut can_double = self.players[i].money() >= &player_bets[i];
+            // Check if player cards are valid for a split and if player has enough money
+            let mut can_split = can_split(&self.players[i].hands()[0]) && can_double;
+
+            // Keep track of busted hands
+            let mut busted = vec![false];
+
+            // Request actions from player
+            loop {
+                for j in 0..self.players[i].hands().len() {
+                    if !busted[j] {
+                        let action = (self.on_action)(PlayerRequest::Play(j), &self.players[i]);
+                        match action {
+                            PlayerAction::Hit => {
+                                self.hit_card(i, 0);
+                                break;
+                            }
+                            PlayerAction::DoubleDown => {
+                                if can_double {
+                                    *self.players[i].money_mut() -= player_bets[i];
+                                    break;
+                                }
+                            }
+                            PlayerAction::Split => {
+                                if can_split {
+                                    *self.players[i].money_mut() -= player_bets[i];
+                                    self.players[i].hands_mut().push(Vec::new());
+                                    busted.push(false);
+                                    // "Draw" card from first hand and place it into second
+                                    let card = cards::draw_card(
+                                        self.players[i].hands_mut().get_mut(0).unwrap(),
+                                    );
+                                    self.players[i].hands_mut()[1].push(card.unwrap());
+                                    // Hit another card to each hand
+                                    self.hit_card(i, 0);
+                                    self.hit_card(i, 1);
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+                can_double = false;
+                can_split = false;
+
+                // Check if any hands busted
+                for i in 0..self.players[i].hands().len() {
+                    if get_hand_value(&self.players[i].hands()[i], true) > 21 {
+                        busted[i] = true;
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -257,7 +351,7 @@ pub fn can_split(hand: &Vec<[char; 2]>) -> bool {
 // --- Tests ---
 #[cfg(test)]
 mod tests {
-    use crate::game::{Dealer, GameAction, Player};
+    use crate::game::{Dealer, Player, PlayerAction, PlayerRequest};
     use crate::{cards, game};
 
     #[test]
@@ -277,12 +371,16 @@ mod tests {
 
     #[test]
     fn player_dealer_tests() {
-        fn on_action(_: &Player, hand: &Vec<[char; 2]>) -> GameAction {
-            let value = game::get_hand_value(hand, true);
-            if value < 17 {
-                GameAction::Hit
+        fn on_action(request: PlayerRequest, player: &Player) -> PlayerAction {
+            if let PlayerRequest::Play(_) = request {
+                let value = game::get_hand_value(&player.hands()[0], true);
+                if value < 17 {
+                    PlayerAction::Hit
+                } else {
+                    PlayerAction::Stand
+                }
             } else {
-                GameAction::Stand
+                PlayerAction::Bet(10)
             }
         }
 
