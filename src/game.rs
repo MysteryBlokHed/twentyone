@@ -199,7 +199,7 @@ impl Dealer<'_> {
             }
         }
 
-        // Get player moves
+        // Get player actions
         for i in 0..self.players.len() {
             // Check if player has enough money to double down
             let mut can_double = self.players[i].money() >= &player_bets[i];
@@ -260,6 +260,27 @@ impl Dealer<'_> {
                 }
             }
         }
+
+        // Dealer play
+        loop {
+            let hand_value = get_hand_value(&self.hand, true);
+            if hand_value >= 17 {
+                if stand_17 {
+                    break;
+                // Check if hand is exactly 17 contains an ace
+                } else if hand_value == 17 && self.hand.iter().any(|&i| i[1] == 'A') {
+                    // Check if ace is acting as an 11 or a 1
+                    if hand_value == get_hand_value(&self.hand, false) {
+                        cards::hit_card(&mut self.shoe, &mut self.hand);
+                    } else {
+                        break;
+                    }
+                }
+                break;
+            } else {
+                cards::hit_card(&mut self.shoe, &mut self.hand);
+            }
+        }
     }
 }
 
@@ -310,7 +331,6 @@ impl Player {
 /// # Arguments
 ///
 /// * `hand` - The hand to get the value of
-/// * `auto_aces` - Turn aces into 1's if 11's will go over 21
 ///
 /// # Examples
 ///
@@ -345,8 +365,8 @@ pub fn get_hand_value(hand: &Vec<[char; 2]>, auto_aces: bool) -> u8 {
         }
     }
     // Add aces
-    // Check if an ace being 11 would bust the hand
     if auto_aces {
+        // Check if an ace being 11 would bust the hand
         for _ in 0..aces {
             if value + 11 > 21 {
                 value += 1;
