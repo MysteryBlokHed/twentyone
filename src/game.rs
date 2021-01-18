@@ -6,13 +6,40 @@ pub enum PlayerAction {
     Stand,
     DoubleDown,
     Split,
+    /// Bet an amount of money
     Bet(i32),
+    None,
 }
 
-/// Requests for the player
-pub enum PlayerRequest {
+/// Requests for the player from the dealer
+pub enum DealerRequest {
+    /// Request a bet from the player
     Bet,
+    /// Request a player to play a hand
+    ///
+    /// # Arguments
+    ///
+    /// * `usize` - The index of the hand to play
     Play(usize),
+    Error(PlayerActionError),
+}
+
+/// Reason for a dealer being unable to perform an action
+pub enum PlayerActionError {
+    /// Not enough money for the requested action
+    ///
+    /// # Arguments
+    ///
+    /// * `usize` - The index of the affected hand, if applicable
+    /// * `PlayerAction` - The attempted action
+    NotEnoughMoney(usize, PlayerAction),
+    /// An unexpected action was returned
+    ///
+    /// # Arguments
+    ///
+    /// * `usize` - The index of the affected hand, if applicable
+    /// * `PlayerAction` - The unexpected action
+    UnexpectedAction(usize, PlayerAction),
 }
 
 /// Describes a blackjack dealer
@@ -20,7 +47,7 @@ pub struct Dealer<'a> {
     hand: Vec<[char; 2]>,
     shoe: Vec<[char; 2]>,
     players: Vec<Player>,
-    on_action: &'a dyn Fn(PlayerRequest, &Player) -> PlayerAction,
+    callback: &'a dyn Fn(DealerRequest, &Player) -> PlayerAction,
 }
 
 /// Describes a blackjack player
@@ -35,22 +62,21 @@ impl Dealer<'_> {
     /// # Arguments
     ///
     /// * `shoe` - The shoe (or deck) to draw from
-    /// * `on_action` - A function to handle player turns
+    /// * `callback` - A function to handle player turns
     ///
-    /// `on_action` gets passed a reference to the active player, and a
-    /// reference to the active hand.
+    /// `callback` is passed a `DealerRequest` and a reference to the active hand.
     ///
     /// # Examples
     ///
     /// ```
     /// use twentyone::cards;
     /// use twentyone::game;
-    /// use twentyone::game::{Dealer, Player, PlayerAction, PlayerRequest};
+    /// use twentyone::game::{Dealer, Player, PlayerAction, DealerRequest};
     ///
-    /// fn on_action(request: PlayerRequest, player: &Player) -> PlayerAction {
-    ///     if let PlayerRequest::Bet = request {
+    /// fn callback(request: DealerRequest, player: &Player) -> PlayerAction {
+    ///     if let DealerRequest::Bet = request {
     ///         PlayerAction::Bet(10)
-    ///     } else if let PlayerRequest::Play(i) = request {
+    ///     } else if let DealerRequest::Play(i) = request {
     ///         let value = game::get_hand_value(&player.hands()[i], true);
     ///         if value < 17 {
     ///          PlayerAction::Hit
@@ -63,17 +89,17 @@ impl Dealer<'_> {
     /// }
     ///
     /// let shoe = cards::create_shoe(6);
-    /// let dealer = Dealer::new(shoe, &on_action);
+    /// let dealer = Dealer::new(shoe, &callback);
     /// ```
     pub fn new<'a>(
         shoe: Vec<[char; 2]>,
-        on_action: &'a dyn Fn(PlayerRequest, &Player) -> PlayerAction,
+        callback: &'a dyn Fn(DealerRequest, &Player) -> PlayerAction,
     ) -> Dealer {
         Dealer {
             hand: Vec::new(),
             shoe: shoe,
             players: Vec::new(),
-            on_action: on_action,
+            callback: callback,
         }
     }
 
@@ -153,16 +179,22 @@ impl Dealer<'_> {
         let mut player_bets: Vec<i32> = Vec::new();
 
         // Get bets
-        for player in self.players.iter_mut() {
+        for i in 0..self.players.len() {
             loop {
-                let bet = (self.on_action)(PlayerRequest::Bet, player);
+                let bet = (self.callback)(DealerRequest::Bet, &self.players[i]);
                 if let PlayerAction::Bet(amount) = bet {
                     // Check if player can afford bet
-                    if *player.money() >= amount {
+                    if self.players[i].money() >= &amount {
                         player_bets.push(amount);
-                        *player.money_mut() -= amount;
+                        *self.players[i].money_mut() -= amount;
                         break;
+                    } else {
+                        let error = PlayerActionError::NotEnoughMoney(0, bet);
+                        (self.callback)(DealerRequest::Error(error), &self.players[i]);
                     }
+                } else {
+                    let error = PlayerActionError::UnexpectedAction(0, bet);
+                    (self.callback)(DealerRequest::Error(error), &self.players[i]);
                 }
             }
         }
@@ -174,30 +206,27 @@ impl Dealer<'_> {
             // Check if player cards are valid for a split and if player has enough money
             let mut can_split = can_split(&self.players[i].hands()[0]) && can_double;
 
-            // Keep track of busted hands
-            let mut busted = vec![false];
+            // Keep track of stood hands
+            let mut stood = vec![false];
 
             // Request actions from player
             loop {
                 for j in 0..self.players[i].hands().len() {
-                    if !busted[j] {
-                        let action = (self.on_action)(PlayerRequest::Play(j), &self.players[i]);
+                    if !stood[j] {
+                        let action = (self.callback)(DealerRequest::Play(j), &self.players[i]);
                         match action {
-                            PlayerAction::Hit => {
-                                self.hit_card(i, 0);
-                                break;
-                            }
+                            PlayerAction::Hit => self.hit_card(i, j),
+                            PlayerAction::Stand => stood[j] = true,
                             PlayerAction::DoubleDown => {
                                 if can_double {
                                     *self.players[i].money_mut() -= player_bets[i];
-                                    break;
                                 }
                             }
                             PlayerAction::Split => {
                                 if can_split {
                                     *self.players[i].money_mut() -= player_bets[i];
                                     self.players[i].hands_mut().push(Vec::new());
-                                    busted.push(false);
+                                    stood.push(false);
                                     // "Draw" card from first hand and place it into second
                                     let card = cards::draw_card(
                                         self.players[i].hands_mut().get_mut(0).unwrap(),
@@ -208,18 +237,26 @@ impl Dealer<'_> {
                                     self.hit_card(i, 1);
                                 }
                             }
-                            _ => {}
+                            _ => {
+                                let error = PlayerActionError::UnexpectedAction(j, action);
+                                (self.callback)(DealerRequest::Error(error), &self.players[i]);
+                            }
                         }
                     }
                 }
                 can_double = false;
                 can_split = false;
 
-                // Check if any hands busted
+                // Check if any hands have beeen stood
                 for i in 0..self.players[i].hands().len() {
                     if get_hand_value(&self.players[i].hands()[i], true) > 21 {
-                        busted[i] = true;
+                        stood[i] = true;
                     }
+                }
+
+                // Break if every hand is stood
+                if stood.iter().min() == stood.iter().max() {
+                    break;
                 }
             }
         }
@@ -351,7 +388,7 @@ pub fn can_split(hand: &Vec<[char; 2]>) -> bool {
 // --- Tests ---
 #[cfg(test)]
 mod tests {
-    use crate::game::{Dealer, Player, PlayerAction, PlayerRequest};
+    use crate::game::{Dealer, DealerRequest, Player, PlayerAction};
     use crate::{cards, game};
 
     #[test]
@@ -371,29 +408,33 @@ mod tests {
 
     #[test]
     fn player_dealer_tests() {
-        fn on_action(request: PlayerRequest, player: &Player) -> PlayerAction {
-            if let PlayerRequest::Play(_) = request {
-                let value = game::get_hand_value(&player.hands()[0], true);
-                if value < 17 {
-                    PlayerAction::Hit
-                } else {
-                    PlayerAction::Stand
+        fn callback(request: DealerRequest, player: &Player) -> PlayerAction {
+            match request {
+                DealerRequest::Play(i) => {
+                    let value = game::get_hand_value(&player.hands()[i], true);
+                    if value < 17 {
+                        PlayerAction::Hit
+                    } else {
+                        PlayerAction::Stand
+                    }
                 }
-            } else {
-                PlayerAction::Bet(10)
+                DealerRequest::Bet => PlayerAction::Bet(10),
+                DealerRequest::Error(_) => PlayerAction::None,
             }
         }
 
         let mut shoe = cards::create_shoe(6);
         cards::shuffle_deck(&mut shoe);
-        let mut dealer = Dealer::new(shoe, &on_action);
+        let mut dealer = Dealer::new(shoe, &callback);
         // Mutable reference to players vector
         let players = dealer.players_mut();
 
         let player = Player::new(1000);
         players.push(player);
 
-        // Deal hands
-        dealer.deal_hands();
+        // Try playing 5 rounds
+        for _ in 0..5 {
+            dealer.play_round(true, true);
+        }
     }
 }
