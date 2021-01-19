@@ -199,6 +199,9 @@ impl Dealer<'_> {
             }
         }
 
+        // Deal hands
+        self.deal_hands();
+
         // Get player actions
         for i in 0..self.players.len() {
             // Check if player has enough money to double down
@@ -255,7 +258,7 @@ impl Dealer<'_> {
                 }
 
                 // Break if every hand is stood
-                if stood.iter().min() == stood.iter().max() {
+                if stood[0] && stood.iter().min() == stood.iter().max() {
                     break;
                 }
             }
@@ -431,15 +434,24 @@ mod tests {
         fn callback(request: DealerRequest, player: &Player) -> PlayerAction {
             match request {
                 DealerRequest::Play(i) => {
+                    println!("Dealer requested play");
                     let value = game::get_hand_value(&player.hands()[i], true);
                     if value < 17 {
+                        println!("Hand is <17, hitting");
                         PlayerAction::Hit
                     } else {
+                        println!("Hand is >=17, standing");
                         PlayerAction::Stand
                     }
                 }
-                DealerRequest::Bet => PlayerAction::Bet(10),
-                DealerRequest::Error(_) => PlayerAction::None,
+                DealerRequest::Bet => {
+                    println!("Dealer requested bet");
+                    PlayerAction::Bet(10)
+                }
+                DealerRequest::Error(_) => {
+                    println!("Dealer returned an error");
+                    PlayerAction::None
+                }
             }
         }
 
@@ -454,6 +466,7 @@ mod tests {
 
         // Try playing 5 rounds
         for _ in 0..5 {
+            println!("--- New Round ---");
             dealer.play_round(true, true);
         }
     }
