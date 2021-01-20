@@ -66,6 +66,25 @@ impl Dealer<'_> {
     ///
     /// `callback` is passed a `DealerRequest` and a reference to the active hand.
     ///
+    /// # Callback
+    ///
+    /// The callback function will always return a `PlayerAction`,
+    /// but it should return different things based on the `DealerRequest`:
+    ///
+    /// | `DealerRequest`                           | `PlayerAction`                                                                                       |
+    /// |-------------------------------------------|------------------------------------------------------------------------------------------------------|
+    /// | `DealerRequest::Bet`                      | `PlayerAction::Bet(i32)`                                                                             |
+    /// | `DealerRequest::Play`                     | One of `PlayerAction::Hit`, `PlayerAction::Stand`, `PlayerAction::DoubleDown`, `PlayerAction::Split` |
+    /// | `DealerRequest::Error(PlayerActionError)` | `PlayerAction::None` and handle the returned error                                                   |
+    ///
+    /// If an unexpected return value is given, the callback will be called
+    ///  again with a request of `DealerAction::Error(PlayerActionError::UnexpectedAction)`
+    /// along with the index of the affected hand (if applicable)
+    /// and the request that was invalid.
+    ///
+    /// After an error is provided, the dealer will request the same action that
+    /// caused the error. If nothing changes, the dealer will infinitely loop.
+    ///
     /// # Examples
     ///
     /// ```
