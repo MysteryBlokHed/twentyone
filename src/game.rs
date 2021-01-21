@@ -491,6 +491,13 @@ mod tests {
                     println!("Dealer requested bet");
                     PlayerAction::Bet(10)
                 }
+                DealerRequest::DealerHand(hand) => {
+                    println!(
+                        "Dealer hand value was {}",
+                        game::get_hand_value(&hand, true)
+                    );
+                    PlayerAction::None
+                }
                 DealerRequest::Error(_) => {
                     println!("Dealer returned an error");
                     PlayerAction::None
