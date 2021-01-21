@@ -1,8 +1,9 @@
 <h1 align="center">twentyone</h1>
 <!-- Shields.io Badges -->
 <p align="center">
-    <a href="https://crates.io/crates/twentyone"><img src="https://img.shields.io/crates/v/twentyone?style=flat-square"></a>
-    <a href="#license"><img src="https://img.shields.io/github/license/MysteryBlokHed/twentyone?style=flat-square"></a>
+    <a href="https://crates.io/crates/twentyone"><img src="https://img.shields.io/crates/v/twentyone"></a>
+    <a href="https://docs.rs/rand/"><img src="https://docs.rs/twentyone/badge.svg"></a>
+    <a href="#license"><img src="https://img.shields.io/github/license/MysteryBlokHed/twentyone"></a>
 </p>
 <!-- End of Badges -->
 <p align="center">A blackjack engine for Rust.</p>
