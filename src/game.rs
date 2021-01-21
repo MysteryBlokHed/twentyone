@@ -21,6 +21,8 @@ pub enum DealerRequest {
     ///
     /// * `usize` - The index of the hand to play
     Play(usize),
+    /// The dealer's hand after they have played
+    DealerHand(Vec<[char; 2]>),
     Error(PlayerActionError),
 }
 
@@ -71,11 +73,12 @@ impl Dealer<'_> {
     /// The callback function will always return a `PlayerAction`,
     /// but it should return different things based on the `DealerRequest`:
     ///
-    /// | `DealerRequest`                           | `PlayerAction`                                                                                       |
-    /// |-------------------------------------------|------------------------------------------------------------------------------------------------------|
-    /// | `DealerRequest::Bet`                      | `PlayerAction::Bet(i32)`                                                                             |
-    /// | `DealerRequest::Play`                     | One of `PlayerAction::Hit`, `PlayerAction::Stand`, `PlayerAction::DoubleDown`, `PlayerAction::Split` |
-    /// | `DealerRequest::Error(PlayerActionError)` | `PlayerAction::None` and handle the returned error                                                   |
+    /// | `DealerRequest`                             | `PlayerAction`                                                                                       |
+    /// |---------------------------------------------|------------------------------------------------------------------------------------------------------|
+    /// | `DealerRequest::Bet`                        | `PlayerAction::Bet(i32)`                                                                             |
+    /// | `DealerRequest::Play`                       | One of `PlayerAction::Hit`, `PlayerAction::Stand`, `PlayerAction::DoubleDown`, `PlayerAction::Split` |
+    /// | `DealerRequest::Error(PlayerActionError)`   | `PlayerAction::None` and handle the returned error                                                   |
+    /// | `DealerRequest::DealerHand(Vec<[char; 2]>)` | `PlayerAction::None`                                                                                 |
     ///
     /// If an unexpected return value is given, the callback will be called
     ///  again with a request of `DealerAction::Error(PlayerActionError::UnexpectedAction)`
@@ -185,6 +188,8 @@ impl Dealer<'_> {
 
     /// Play a round of blackjack
     ///
+    /// Calls `callback` to get player bets/actions.
+    ///
     /// # Arguments
     ///
     /// * `clear_table` - Clear the table at the beginning of the round
@@ -242,11 +247,13 @@ impl Dealer<'_> {
                             PlayerAction::DoubleDown => {
                                 if can_double {
                                     *self.players[i].money_mut() -= player_bets[i];
+                                    player_bets[i] *= 2;
                                 }
                             }
                             PlayerAction::Split => {
                                 if can_split {
                                     *self.players[i].money_mut() -= player_bets[i];
+                                    player_bets[i] *= 2;
                                     self.players[i].hands_mut().push(Vec::new());
                                     stood.push(false);
                                     // "Draw" card from first hand and place it into second
@@ -303,6 +310,23 @@ impl Dealer<'_> {
                 cards::hit_card(&mut self.shoe, &mut self.hand);
             }
         }
+
+        // Pay out winners
+        for i in 0..self.players.len() {
+            for j in 0..self.players[i].hands().len() {
+                if get_hand_value(&self.players[i].hands()[j], true) < 21 {
+                    // Give back double the bet over the amount of hands
+                    // (stops from overpaying split hands if both won)
+                    self.players[i].money +=
+                        player_bets[i] * 2 / self.players[i].hands().len() as i32;
+                }
+            }
+        }
+
+        (self.callback)(
+            DealerRequest::DealerHand(self.hand.clone()),
+            &Player::new(0),
+        );
     }
 }
 
