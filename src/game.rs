@@ -248,6 +248,15 @@ impl Dealer<'_> {
                                 if can_double {
                                     *self.players[i].money_mut() -= player_bets[i];
                                     player_bets[i] *= 2;
+                                    stood[j] = true;
+                                    self.hit_card(i, j);
+                                } else {
+                                    (self.callback)(
+                                        DealerRequest::Error(PlayerActionError::UnexpectedAction(
+                                            j, action,
+                                        )),
+                                        &self.players[i],
+                                    );
                                 }
                             }
                             PlayerAction::Split => {
@@ -264,6 +273,13 @@ impl Dealer<'_> {
                                     // Hit another card to each hand
                                     self.hit_card(i, 0);
                                     self.hit_card(i, 1);
+                                } else {
+                                    (self.callback)(
+                                        DealerRequest::Error(PlayerActionError::UnexpectedAction(
+                                            j, action,
+                                        )),
+                                        &self.players[i],
+                                    );
                                 }
                             }
                             _ => {
@@ -327,7 +343,7 @@ impl Dealer<'_> {
 
                 // Pay out normal amount if player did not bust, did not have blackjack,
                 // and beat dealer/dealer busted
-                if hand_value < 21 && (busted || hand_value >= dealer_hand_value) {
+                if hand_value < 21 && (busted || hand_value > dealer_hand_value) {
                     self.players[i].money +=
                         player_bets[i] * 2 / self.players[i].hands().len() as i32;
                 } else if hand_value == 21 {
