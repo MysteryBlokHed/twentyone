@@ -277,8 +277,8 @@ impl Dealer<'_> {
                 can_split = false;
 
                 // Check if any hands have beeen stood
-                for i in 0..self.players[i].hands().len() {
-                    if get_hand_value(&self.players[i].hands()[i], true) > 21 {
+                for j in 0..self.players[i].hands().len() {
+                    if get_hand_value(&self.players[i].hands()[j], true) > 21 {
                         stood[i] = true;
                     }
                 }
@@ -291,9 +291,13 @@ impl Dealer<'_> {
         }
 
         // Dealer play
+        let mut busted = false;
         loop {
             let hand_value = get_hand_value(&self.hand, true);
-            if hand_value >= 17 {
+            if hand_value > 21 {
+                busted = true;
+                break;
+            } else if hand_value >= 17 {
                 if stand_17 {
                     break;
                 // Check if hand is exactly 17 contains an ace
@@ -312,13 +316,39 @@ impl Dealer<'_> {
         }
 
         // Pay out winners
+        let dealer_hand_value = get_hand_value(&self.hand, true);
         for i in 0..self.players.len() {
             for j in 0..self.players[i].hands().len() {
-                if get_hand_value(&self.players[i].hands()[j], true) < 21 {
-                    // Give back double the bet over the amount of hands
-                    // (stops from overpaying split hands if both won)
+                let hand_value = get_hand_value(&self.players[i].hands()[j], true);
+                // Check if player busted
+                if hand_value > 21 {
+                    continue;
+                }
+
+                // Pay out normal amount if player did not bust, did not have blackjack,
+                // and beat dealer/dealer busted
+                if hand_value < 21 && (busted || hand_value >= dealer_hand_value) {
                     self.players[i].money +=
                         player_bets[i] * 2 / self.players[i].hands().len() as i32;
+                } else if hand_value == 21 {
+                    // Check if player had blackjack
+                    if self.players[i].hands()[j].len() == 2 {
+                        // Make sure dealer didn't have blackjack
+                        if dealer_hand_value == 21 && self.hand.len() == 2 {
+                            // Push, refund player
+                            self.players[i].money += player_bets[i];
+                        } else {
+                            // Pay out 3 to 2
+                            self.players[i].money +=
+                                player_bets[i] + (player_bets[i] as f32 * 1.5) as i32;
+                        }
+                    } else {
+                        self.players[i].money +=
+                            player_bets[i] * 2 / self.players[i].hands().len() as i32;
+                    }
+                // Push, refund player
+                } else {
+                    self.players[i].money += player_bets[i];
                 }
             }
         }
