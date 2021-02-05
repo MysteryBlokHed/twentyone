@@ -90,29 +90,7 @@ impl Dealer<'_> {
     ///
     /// # Examples
     ///
-    /// ```
-    /// use twentyone::cards;
-    /// use twentyone::game;
-    /// use twentyone::game::{Dealer, Player, PlayerAction, DealerRequest};
-    ///
-    /// fn callback(request: DealerRequest, player: &Player) -> PlayerAction {
-    ///     if let DealerRequest::Bet = request {
-    ///         PlayerAction::Bet(10)
-    ///     } else if let DealerRequest::Play(i) = request {
-    ///         let value = game::get_hand_value(&player.hands()[i], true);
-    ///         if value < 17 {
-    ///          PlayerAction::Hit
-    ///         } else {
-    ///             PlayerAction::Stand
-    ///         }
-    ///     } else {
-    ///         PlayerAction::Stand
-    ///     }
-    /// }
-    ///
-    /// let shoe = cards::create_shoe(6);
-    /// let dealer = Dealer::new(shoe, &callback);
-    /// ```
+    /// Example code is available in the [Quick Start](../index.html#quick-start) from the main page.
     pub fn new<'a>(
         shoe: Vec<[char; 2]>,
         callback: &'a dyn Fn(DealerRequest, &Player) -> PlayerAction,
