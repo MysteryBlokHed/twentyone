@@ -9,12 +9,12 @@
 //! use twentyone::game::*;
 //!
 //! // Callback that will be used to return player's actions such as betting or hitting
-//! fn callback(request: DealerRequest, player: &Player) -> PlayerAction {
+//! fn callback(request: DealerRequest, player: Option<&Player>) -> PlayerAction {
 //!     match request {
 //!         // Dealer asking player to play, along with a hand index
 //!         DealerRequest::Play(i) => {
 //!             // Get the value of the player's hand
-//!             let value = get_hand_value(&player.hands()[i], true);
+//!             let value = get_hand_value(&player.unwrap().hands()[i], true);
 //!             // Hit if the hand value is <17, stand if it isn't
 //!             if value < 17 {
 //!                 PlayerAction::Hit

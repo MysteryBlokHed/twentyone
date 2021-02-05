@@ -58,7 +58,7 @@ pub struct Dealer<'a> {
     hand: Vec<[char; 2]>,
     shoe: Vec<[char; 2]>,
     players: Vec<Player>,
-    callback: &'a dyn Fn(DealerRequest, &Player) -> PlayerAction,
+    callback: &'a dyn Fn(DealerRequest, Option<&Player>) -> PlayerAction,
 }
 
 /// Describes a blackjack player
@@ -75,7 +75,9 @@ impl Dealer<'_> {
     /// * `shoe` - The shoe (or deck) to draw from
     /// * `callback` - A function to handle player turns
     ///
-    /// `callback` is passed a `DealerRequest` and a reference to the active hand.
+    /// `callback` is passed a `DealerRequest` and an `Option<&Player>`.
+    /// The option will always have a player if it applies to the event (eg. betting),
+    /// but will not have a player for dealer updates (eg. up card, dealer hits).
     ///
     /// # Callback
     ///
@@ -104,7 +106,7 @@ impl Dealer<'_> {
     /// Example code is available in the [Quick Start](../index.html#quick-start) from the main page.
     pub fn new<'a>(
         shoe: Vec<[char; 2]>,
-        callback: &'a dyn Fn(DealerRequest, &Player) -> PlayerAction,
+        callback: &'a dyn Fn(DealerRequest, Option<&Player>) -> PlayerAction,
     ) -> Dealer {
         Dealer {
             hand: Vec::new(),
@@ -194,7 +196,7 @@ impl Dealer<'_> {
         // Get bets
         for i in 0..self.players.len() {
             loop {
-                let bet = (self.callback)(DealerRequest::Bet, &self.players[i]);
+                let bet = (self.callback)(DealerRequest::Bet, Some(&self.players[i]));
                 if let PlayerAction::Bet(amount) = bet {
                     // Check if player can afford bet
                     if self.players[i].money() >= &amount {
@@ -203,11 +205,11 @@ impl Dealer<'_> {
                         break;
                     } else {
                         let error = PlayerActionError::NotEnoughMoney(0, bet);
-                        (self.callback)(DealerRequest::Error(error), &self.players[i]);
+                        (self.callback)(DealerRequest::Error(error), Some(&self.players[i]));
                     }
                 } else {
                     let error = PlayerActionError::UnexpectedAction(0, bet);
-                    (self.callback)(DealerRequest::Error(error), &self.players[i]);
+                    (self.callback)(DealerRequest::Error(error), Some(&self.players[i]));
                 }
             }
         }
@@ -216,7 +218,7 @@ impl Dealer<'_> {
         self.deal_hands();
 
         // Send dealer up card
-        (self.callback)(DealerRequest::UpCard(self.hand[1]), &Player::new(0));
+        (self.callback)(DealerRequest::UpCard(self.hand[1]), None);
 
         // Get player actions
         for i in 0..self.players.len() {
@@ -232,7 +234,8 @@ impl Dealer<'_> {
             loop {
                 for j in 0..self.players[i].hands().len() {
                     if !stood[j] {
-                        let action = (self.callback)(DealerRequest::Play(j), &self.players[i]);
+                        let action =
+                            (self.callback)(DealerRequest::Play(j), Some(&self.players[i]));
                         match action {
                             PlayerAction::Hit => self.hit_card(i, j),
                             PlayerAction::Stand => stood[j] = true,
@@ -247,7 +250,7 @@ impl Dealer<'_> {
                                         DealerRequest::Error(PlayerActionError::UnexpectedAction(
                                             j, action,
                                         )),
-                                        &self.players[i],
+                                        Some(&self.players[i]),
                                     );
                                 }
                             }
@@ -270,13 +273,16 @@ impl Dealer<'_> {
                                         DealerRequest::Error(PlayerActionError::UnexpectedAction(
                                             j, action,
                                         )),
-                                        &self.players[i],
+                                        Some(&self.players[i]),
                                     );
                                 }
                             }
                             _ => {
                                 let error = PlayerActionError::UnexpectedAction(j, action);
-                                (self.callback)(DealerRequest::Error(error), &self.players[i]);
+                                (self.callback)(
+                                    DealerRequest::Error(error),
+                                    Some(&self.players[i]),
+                                );
                             }
                         }
                     }
@@ -314,7 +320,7 @@ impl Dealer<'_> {
                     if hand_value == get_hand_value(&self.hand, false) {
                         let card = cards::draw_card(&mut self.shoe).unwrap();
                         self.hand.push(card);
-                        (self.callback)(DealerRequest::HitCard(card), &Player::new(0));
+                        (self.callback)(DealerRequest::HitCard(card), None);
                     } else {
                         break;
                     }
@@ -323,7 +329,7 @@ impl Dealer<'_> {
             } else {
                 let card = cards::draw_card(&mut self.shoe).unwrap();
                 self.hand.push(card);
-                (self.callback)(DealerRequest::HitCard(card), &Player::new(0));
+                (self.callback)(DealerRequest::HitCard(card), None);
             }
         }
 
@@ -365,10 +371,7 @@ impl Dealer<'_> {
             }
         }
 
-        (self.callback)(
-            DealerRequest::DealerHand(self.hand.clone()),
-            &Player::new(0),
-        );
+        (self.callback)(DealerRequest::DealerHand(self.hand.clone()), None);
     }
 }
 
@@ -516,11 +519,11 @@ mod tests {
 
     #[test]
     fn player_dealer_tests() {
-        fn callback(request: DealerRequest, player: &Player) -> PlayerAction {
+        fn callback(request: DealerRequest, player: Option<&Player>) -> PlayerAction {
             match request {
                 DealerRequest::Play(i) => {
                     println!("Dealer requested play");
-                    let value = game::get_hand_value(&player.hands()[i], true);
+                    let value = game::get_hand_value(&player.unwrap().hands()[i], true);
                     if value < 17 {
                         println!("Hand is <17, hitting");
                         PlayerAction::Hit
