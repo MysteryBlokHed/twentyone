@@ -34,9 +34,9 @@
 //!             PlayerAction::None
 //!         }
 //!         // Dealer returning an error with the last action
-//!         DealerRequest::Error(_) => {
-//!             PlayerAction::None
-//!         }
+//!         DealerRequest::Error(_) => PlayerAction::None,
+//!         // Other events that don't require specific handling
+//!         _ => PlayerAction::None,
 //!     }
 //! }
 //! ```

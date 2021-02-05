@@ -21,8 +21,17 @@ pub enum DealerRequest {
     ///
     /// * `usize` - The index of the hand to play
     Play(usize),
+    /// The dealer's up card
+    UpCard([char; 2]),
+    /// The dealer's hit card
+    HitCard([char; 2]),
     /// The dealer's hand after they have played
     DealerHand(Vec<[char; 2]>),
+    /// An error with a PlayerAction
+    ///
+    /// # Arguments
+    ///
+    /// * `PlayerActionError` - More info on why the error occurred
     Error(PlayerActionError),
 }
 
@@ -78,6 +87,8 @@ impl Dealer<'_> {
     /// | `DealerRequest::Bet`                        | `PlayerAction::Bet(i32)`                                                                             |
     /// | `DealerRequest::Play`                       | One of `PlayerAction::Hit`, `PlayerAction::Stand`, `PlayerAction::DoubleDown`, `PlayerAction::Split` |
     /// | `DealerRequest::Error(PlayerActionError)`   | `PlayerAction::None` and handle the returned error                                                   |
+    /// | `DealerRequest::UpCard([char; 2])`          | `PlayerAction::None`                                                                                 |
+    /// | `DealerRequest::HitCard([char; 2])`         | `PlayerAction::None`                                                                                 |
     /// | `DealerRequest::DealerHand(Vec<[char; 2]>)` | `PlayerAction::None`                                                                                 |
     ///
     /// If an unexpected return value is given, the callback will be called
@@ -204,6 +215,9 @@ impl Dealer<'_> {
         // Deal hands
         self.deal_hands();
 
+        // Send dealer up card
+        (self.callback)(DealerRequest::UpCard(self.hand[1]), &Player::new(0));
+
         // Get player actions
         for i in 0..self.players.len() {
             // Check if player has enough money to double down
@@ -298,14 +312,18 @@ impl Dealer<'_> {
                 } else if hand_value == 17 && self.hand.iter().any(|&i| i[1] == 'A') {
                     // Check if ace is acting as an 11 or a 1
                     if hand_value == get_hand_value(&self.hand, false) {
-                        cards::hit_card(&mut self.shoe, &mut self.hand);
+                        let card = cards::draw_card(&mut self.shoe).unwrap();
+                        self.hand.push(card);
+                        (self.callback)(DealerRequest::HitCard(card), &Player::new(0));
                     } else {
                         break;
                     }
                 }
                 break;
             } else {
-                cards::hit_card(&mut self.shoe, &mut self.hand);
+                let card = cards::draw_card(&mut self.shoe).unwrap();
+                self.hand.push(card);
+                (self.callback)(DealerRequest::HitCard(card), &Player::new(0));
             }
         }
 
@@ -514,6 +532,14 @@ mod tests {
                 DealerRequest::Bet => {
                     println!("Dealer requested bet");
                     PlayerAction::Bet(10)
+                }
+                DealerRequest::UpCard(card) => {
+                    println!("Dealer up card: {}{}", card[0], card[1]);
+                    PlayerAction::None
+                }
+                DealerRequest::HitCard(card) => {
+                    println!("Dealer hit card: {}{}", card[0], card[1]);
+                    PlayerAction::None
                 }
                 DealerRequest::DealerHand(hand) => {
                     println!(
