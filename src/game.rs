@@ -230,80 +230,82 @@ impl Dealer<'_> {
             // Keep track of stood hands
             let mut stood = vec![false];
 
-            // Request actions from player
+            // Active hand
+            let mut hand_count = 1;
+            let mut j = 0;
+            // Get actions from each hand, one at a time
+            // Using a loop and incrementing j manually because for loops would not recheck
+            // length of player.hands() after a split
             loop {
-                for j in 0..self.players[i].hands().len() {
-                    if !stood[j] {
-                        let action =
-                            (self.callback)(DealerRequest::Play(j), Some(&self.players[i]), &self);
-                        match action {
-                            PlayerAction::Hit => self.hit_card(i, j),
-                            PlayerAction::Stand => stood[j] = true,
-                            PlayerAction::DoubleDown => {
-                                if can_double {
-                                    *self.players[i].money_mut() -= player_bets[i];
-                                    player_bets[i] *= 2;
-                                    stood[j] = true;
-                                    self.hit_card(i, j);
-                                } else {
-                                    (self.callback)(
-                                        DealerRequest::Error(PlayerActionError::UnexpectedAction(
-                                            j, action,
-                                        )),
-                                        Some(&self.players[i]),
-                                        &self,
-                                    );
-                                }
-                            }
-                            PlayerAction::Split => {
-                                if can_split {
-                                    *self.players[i].money_mut() -= player_bets[i];
-                                    player_bets[i] *= 2;
-                                    self.players[i].hands_mut().push(Vec::new());
-                                    stood.push(false);
-                                    // "Draw" card from first hand and place it into second
-                                    let card = cards::draw_card(
-                                        self.players[i].hands_mut().get_mut(0).unwrap(),
-                                    );
-                                    self.players[i].hands_mut()[1].push(card.unwrap());
-                                    // Hit another card to each hand
-                                    self.hit_card(i, 0);
-                                    self.hit_card(i, 1);
-                                } else {
-                                    (self.callback)(
-                                        DealerRequest::Error(PlayerActionError::UnexpectedAction(
-                                            j, action,
-                                        )),
-                                        Some(&self.players[i]),
-                                        &self,
-                                    );
-                                }
-                            }
-                            _ => {
-                                let error = PlayerActionError::UnexpectedAction(j, action);
+                if j >= hand_count {
+                    break;
+                }
+                while !stood[j] {
+                    let action =
+                        (self.callback)(DealerRequest::Play(j), Some(&self.players[i]), &self);
+                    match action {
+                        PlayerAction::Hit => self.hit_card(i, j),
+                        PlayerAction::Stand => stood[j] = true,
+                        PlayerAction::DoubleDown => {
+                            if can_double {
+                                *self.players[i].money_mut() -= player_bets[i];
+                                player_bets[i] *= 2;
+                                stood[j] = true;
+                                self.hit_card(i, j);
+                            } else {
                                 (self.callback)(
-                                    DealerRequest::Error(error),
+                                    DealerRequest::Error(PlayerActionError::UnexpectedAction(
+                                        j, action,
+                                    )),
                                     Some(&self.players[i]),
                                     &self,
                                 );
                             }
                         }
+                        PlayerAction::Split => {
+                            if can_split {
+                                *self.players[i].money_mut() -= player_bets[i];
+                                player_bets[i] *= 2;
+                                self.players[i].hands_mut().push(Vec::new());
+                                stood.push(false);
+                                // "Draw" card from first hand and place it into second
+                                let card = cards::draw_card(
+                                    self.players[i].hands_mut().get_mut(0).unwrap(),
+                                );
+                                self.players[i].hands_mut()[1].push(card.unwrap());
+                                // Hit another card to each hand
+                                self.hit_card(i, 0);
+                                self.hit_card(i, 1);
+                                hand_count = 2;
+                            } else {
+                                (self.callback)(
+                                    DealerRequest::Error(PlayerActionError::UnexpectedAction(
+                                        j, action,
+                                    )),
+                                    Some(&self.players[i]),
+                                    &self,
+                                );
+                            }
+                        }
+                        _ => {
+                            let error = PlayerActionError::UnexpectedAction(j, action);
+                            (self.callback)(
+                                DealerRequest::Error(error),
+                                Some(&self.players[i]),
+                                &self,
+                            );
+                        }
                     }
-                }
-                can_double = false;
-                can_split = false;
 
-                // Check if any hands have beeen stood
-                for j in 0..self.players[i].hands().len() {
+                    // Check if the hand is busted
                     if get_hand_value(&self.players[i].hands()[j], true) > 21 {
-                        stood[i] = true;
+                        stood[j] = true;
                     }
-                }
 
-                // Break if every hand is stood
-                if stood[0] && stood.iter().min() == stood.iter().max() {
-                    break;
+                    can_double = false;
+                    can_split = false;
                 }
+                j += 1;
             }
         }
 
