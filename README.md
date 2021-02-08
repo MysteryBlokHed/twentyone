@@ -12,6 +12,9 @@
 
 To build the project, run `cargo build` in the project's root directory.
 
+To build project documentation, run `cargo doc` in the project's root directory.
+Generated documentation will be available at `/target/doc/twentyone/index.html`.
+
 ## Including as a dependency
 
 ### Via crates.io
