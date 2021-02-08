@@ -353,7 +353,7 @@ impl Dealer<'_> {
                 if hand_value < 21 && (busted || hand_value > dealer_hand_value) {
                     self.players[i].money +=
                         player_bets[i] * 2 / self.players[i].hands().len() as i32;
-                } else if hand_value == 21 {
+                } else if hand_value == 21 && (busted || hand_value > dealer_hand_value) {
                     // Check if player had blackjack
                     if self.players[i].hands()[j].len() == 2 {
                         // Make sure dealer didn't have blackjack
@@ -370,7 +370,7 @@ impl Dealer<'_> {
                             player_bets[i] * 2 / self.players[i].hands().len() as i32;
                     }
                 // Push, refund player
-                } else {
+                } else if hand_value == dealer_hand_value {
                     self.players[i].money += player_bets[i];
                 }
             }
