@@ -8,6 +8,46 @@
 <!-- End of Badges -->
 <p align="center">A blackjack engine for Rust.</p>
 
+## Building
+
+To build the project, run `cargo build` in the project's root directory.
+
+## Including as a dependency
+
+### Via crates.io
+
+To add this project as a dependency via crates.io, add the following
+to your `Cargo.toml` dependencies:
+
+```toml
+[dependencies]
+twentyone = "0.1"
+```
+
+### Via git
+
+To add this project as a dependency via the git repository,
+add the following to your `Cargo.toml` dependencies:
+
+```toml
+[dependencies]
+twentyone = { git = "https://github.com/MysteryBlokHed/twentyone" }
+```
+
+### Via a local build
+
+After building this project, to add it as a dependency elsewhere,
+add the following to your `Cargo.toml` dependencies:
+
+```toml
+[dependencies]
+twentyone = { path = "/path/to/build/location" }
+```
+
+## Documentation
+
+Documentation is available at <https://docs.rs/twentyone/>.
+
 ## License
 
 This project is licensed under the Apache License, Version 2.0
