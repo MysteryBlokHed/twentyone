@@ -8,12 +8,20 @@
 <!-- End of Badges -->
 <p align="center">A blackjack engine for Rust.</p>
 
-## Building
+## Building & Testing
 
 To build the project, run `cargo build` in the project's root directory.
 
+To test the project, run `cargo test`. To show output from tests with prints,
+run `cargo test -- --nocapture`.
+
 To build project documentation, run `cargo doc` in the project's root directory.
 Generated documentation will be available at `/target/doc/twentyone/index.html`.
+
+## Examples
+
+To run an included example, run `cargo run --example example_name`. For example,
+to run the [solo_cli example](examples/solo_cli.rs), you would run `cargo run --example solo_cli`.
 
 ## Including as a dependency
 
