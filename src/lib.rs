@@ -67,7 +67,7 @@
 //!     shuffle_deck(&mut shoe);
 //!
 //!     // Create a dealer
-//!     let mut dealer = Dealer::new(shoe, &callback);
+//!     let mut dealer = Dealer::new(shoe, DEFAULT_CONFIG, &callback);
 //!     // Create a player with $1000
 //!     let player = Player::new(1000);
 //!     // Add the player to the dealer
@@ -75,7 +75,7 @@
 //!
 //!     // Auto-play five rounds
 //!     for _ in 0..5 {
-//!         dealer.play_round(true, true);
+//!         dealer.play_round(true);
 //!     }
 //! }
 //!

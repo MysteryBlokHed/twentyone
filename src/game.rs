@@ -53,11 +53,34 @@ pub enum PlayerActionError {
     UnexpectedAction(usize, PlayerAction),
 }
 
+/// Configure different aspects of the game
+///
+/// # Fields
+///
+/// * `stand_soft_17` - Whether the dealer should stand on soft 17 or hit
+/// * `blackjack_payout` - The multiplier for when a player gets a blackjack
+/// * `double_after_split` - Whether to allow doubling down after splitting
+pub struct GameConfig {
+    pub stand_soft_17: bool,
+    pub blackjack_payout: f32,
+    pub double_after_split: bool,
+}
+
+/// A default configuration for game settings.
+///
+/// Stands on soft 17, pays out blackjacks 3 to 2, allows doubling after splitting,
+pub const DEFAULT_CONFIG: GameConfig = GameConfig {
+    stand_soft_17: false,
+    blackjack_payout: 1.5,
+    double_after_split: true,
+};
+
 /// Describes a blackjack dealer
 pub struct Dealer<'a> {
     hand: Vec<[char; 2]>,
     shoe: Vec<[char; 2]>,
     players: Vec<Player>,
+    config: GameConfig,
     callback: &'a dyn Fn(DealerRequest, Option<&Player>, &Dealer) -> PlayerAction,
 }
 
@@ -106,12 +129,14 @@ impl Dealer<'_> {
     /// Example code is available in the [Quick Start](../index.html#quick-start) from the main page.
     pub fn new<'a>(
         shoe: Vec<[char; 2]>,
+        game_config: GameConfig,
         callback: &'a dyn Fn(DealerRequest, Option<&Player>, &Dealer) -> PlayerAction,
     ) -> Dealer {
         Dealer {
             hand: Vec::new(),
             shoe: shoe,
             players: Vec::new(),
+            config: game_config,
             callback: callback,
         }
     }
@@ -184,9 +209,7 @@ impl Dealer<'_> {
     /// # Arguments
     ///
     /// * `clear_table` - Clear the table at the beginning of the round
-    /// * `stand_17` - `true` if the dealer should stand on soft 17,
-    /// `false` if the dealer should hit
-    pub fn play_round(&mut self, clear_table: bool, stand_17: bool) {
+    pub fn play_round(&mut self, clear_table: bool) {
         if clear_table {
             self.clear_table();
         }
@@ -317,7 +340,7 @@ impl Dealer<'_> {
                 busted = true;
                 break;
             } else if hand_value >= 17 {
-                if stand_17 {
+                if self.config.stand_soft_17 {
                     break;
                 // Check if hand is exactly 17 contains an ace
                 } else if hand_value == 17 && self.hand.iter().any(|&i| i[1] == 'A') {
@@ -362,8 +385,8 @@ impl Dealer<'_> {
                             self.players[i].money += player_bets[i];
                         } else {
                             // Pay out 3 to 2
-                            self.players[i].money +=
-                                player_bets[i] + (player_bets[i] as f32 * 1.5) as i32;
+                            self.players[i].money += player_bets[i]
+                                + (player_bets[i] as f32 * self.config.blackjack_payout) as i32;
                         }
                     } else {
                         self.players[i].money +=

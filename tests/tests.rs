@@ -94,7 +94,7 @@ mod tests {
 
         let mut shoe = cards::create_shoe(6);
         cards::shuffle_deck(&mut shoe);
-        let mut dealer = Dealer::new(shoe, &callback);
+        let mut dealer = Dealer::new(shoe, game::DEFAULT_CONFIG, &callback);
         // Mutable reference to players vector
         let players = dealer.players_mut();
 
@@ -104,7 +104,7 @@ mod tests {
         // Try playing 5 rounds
         for _ in 0..5 {
             println!("--- New Round ---");
-            dealer.play_round(true, true);
+            dealer.play_round(true);
         }
     }
 }
