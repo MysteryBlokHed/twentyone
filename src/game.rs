@@ -246,9 +246,9 @@ impl Dealer<'_> {
         // Get player actions
         for i in 0..self.players.len() {
             // Check if player has enough money to double down
-            let mut can_double = self.players[i].money() >= &player_bets[i];
+            let mut can_double = vec![self.players[i].money() >= &player_bets[i]];
             // Check if player cards are valid for a split and if player has enough money
-            let mut can_split = can_split(&self.players[i].hands()[0]) && can_double;
+            let mut can_split = can_split(&self.players[i].hands()[0]) && can_double[0];
 
             // Keep track of stood hands
             let mut stood = vec![false];
@@ -267,14 +267,18 @@ impl Dealer<'_> {
                     let action =
                         (self.callback)(DealerRequest::Play(j), Some(&self.players[i]), &self);
                     match action {
-                        PlayerAction::Hit => self.hit_card(i, j),
+                        PlayerAction::Hit => {
+                            self.hit_card(i, j);
+                            can_double[j] = false;
+                        }
                         PlayerAction::Stand => stood[j] = true,
                         PlayerAction::DoubleDown => {
-                            if can_double {
+                            if can_double[j] {
                                 *self.players[i].money_mut() -= player_bets[i];
                                 player_bets[i] *= 2;
                                 stood[j] = true;
                                 self.hit_card(i, j);
+                                can_double[j] = false;
                             } else {
                                 (self.callback)(
                                     DealerRequest::Error(PlayerActionError::UnexpectedAction(
@@ -291,6 +295,12 @@ impl Dealer<'_> {
                                 player_bets[i] *= 2;
                                 self.players[i].hands_mut().push(Vec::new());
                                 stood.push(false);
+                                if self.config.double_after_split {
+                                    can_double.push(true);
+                                } else {
+                                    can_double[0] = false;
+                                    can_double.push(false);
+                                }
                                 // "Draw" card from first hand and place it into second
                                 let card = cards::draw_card(
                                     self.players[i].hands_mut().get_mut(0).unwrap(),
@@ -300,6 +310,7 @@ impl Dealer<'_> {
                                 self.hit_card(i, 0);
                                 self.hit_card(i, 1);
                                 hand_count = 2;
+                                can_split = false;
                             } else {
                                 (self.callback)(
                                     DealerRequest::Error(PlayerActionError::UnexpectedAction(
@@ -324,9 +335,6 @@ impl Dealer<'_> {
                     if get_hand_value(&self.players[i].hands()[j], true) > 21 {
                         stood[j] = true;
                     }
-
-                    can_double = false;
-                    can_split = false;
                 }
                 j += 1;
             }
