@@ -181,14 +181,11 @@ impl Dealer<'_> {
 
     /// Deal a hand to all players
     pub fn deal_hands(&mut self) {
-        // Dealer's hand
-        cards::hit_card(&mut self.shoe, &mut self.hand);
-        cards::hit_card(&mut self.shoe, &mut self.hand);
-
-        // Players' hands
-        for player in self.players.iter_mut() {
-            cards::hit_card(&mut self.shoe, &mut player.hands_mut()[0]);
-            cards::hit_card(&mut self.shoe, &mut player.hands_mut()[0]);
+        for _ in 0..2 {
+            cards::hit_card(&mut self.shoe, &mut self.hand);
+            for player in self.players.iter_mut() {
+                cards::hit_card(&mut self.shoe, &mut player.hands_mut()[0]);
+            }
         }
     }
 
@@ -253,6 +250,10 @@ impl Dealer<'_> {
             // Keep track of stood hands
             let mut stood = vec![false];
 
+            // Keep track of original bet
+            // Used when doubling after splitting
+            let original_bet = player_bets[i];
+
             // Active hand
             let mut hand_count = 1;
             let mut j = 0;
@@ -274,8 +275,8 @@ impl Dealer<'_> {
                         PlayerAction::Stand => stood[j] = true,
                         PlayerAction::DoubleDown => {
                             if can_double[j] {
-                                *self.players[i].money_mut() -= player_bets[i];
-                                player_bets[i] *= 2;
+                                *self.players[i].money_mut() -= original_bet;
+                                player_bets[i] += original_bet;
                                 stood[j] = true;
                                 self.hit_card(i, j);
                                 can_double[j] = false;
@@ -291,8 +292,8 @@ impl Dealer<'_> {
                         }
                         PlayerAction::Split => {
                             if can_split {
-                                *self.players[i].money_mut() -= player_bets[i];
-                                player_bets[i] *= 2;
+                                *self.players[i].money_mut() -= original_bet;
+                                player_bets[i] += original_bet;
                                 self.players[i].hands_mut().push(Vec::new());
                                 stood.push(false);
                                 if self.config.double_after_split {
