@@ -68,9 +68,9 @@ pub struct GameConfig {
 
 /// A default configuration for game settings.
 ///
-/// Stands on soft 17, pays out blackjacks 3 to 2, allows doubling after splitting,
+/// Stands on soft 17, pays out blackjacks 3 to 2, and allows doubling after splitting.
 pub const DEFAULT_CONFIG: GameConfig = GameConfig {
-    stand_soft_17: false,
+    stand_soft_17: true,
     blackjack_payout: 1.5,
     double_after_split: true,
 };
