@@ -53,11 +53,34 @@ pub enum PlayerActionError {
     UnexpectedAction(usize, PlayerAction),
 }
 
+/// Configure different aspects of the game
+///
+/// # Fields
+///
+/// * `stand_soft_17` - Whether the dealer should stand on soft 17 or hit
+/// * `blackjack_payout` - The multiplier for when a player gets a blackjack
+/// * `double_after_split` - Whether to allow doubling down after splitting
+pub struct GameConfig {
+    pub stand_soft_17: bool,
+    pub blackjack_payout: f32,
+    pub double_after_split: bool,
+}
+
+/// A default configuration for game settings.
+///
+/// Stands on soft 17, pays out blackjacks 3 to 2, and allows doubling after splitting.
+pub const DEFAULT_CONFIG: GameConfig = GameConfig {
+    stand_soft_17: true,
+    blackjack_payout: 1.5,
+    double_after_split: true,
+};
+
 /// Describes a blackjack dealer
 pub struct Dealer<'a> {
     hand: Vec<[char; 2]>,
     shoe: Vec<[char; 2]>,
     players: Vec<Player>,
+    config: GameConfig,
     callback: &'a dyn Fn(DealerRequest, Option<&Player>, &Dealer) -> PlayerAction,
 }
 
@@ -106,12 +129,14 @@ impl Dealer<'_> {
     /// Example code is available in the [Quick Start](../index.html#quick-start) from the main page.
     pub fn new<'a>(
         shoe: Vec<[char; 2]>,
+        game_config: GameConfig,
         callback: &'a dyn Fn(DealerRequest, Option<&Player>, &Dealer) -> PlayerAction,
     ) -> Dealer {
         Dealer {
             hand: Vec::new(),
             shoe: shoe,
             players: Vec::new(),
+            config: game_config,
             callback: callback,
         }
     }
@@ -156,14 +181,11 @@ impl Dealer<'_> {
 
     /// Deal a hand to all players
     pub fn deal_hands(&mut self) {
-        // Dealer's hand
-        cards::hit_card(&mut self.shoe, &mut self.hand);
-        cards::hit_card(&mut self.shoe, &mut self.hand);
-
-        // Players' hands
-        for player in self.players.iter_mut() {
-            cards::hit_card(&mut self.shoe, &mut player.hands_mut()[0]);
-            cards::hit_card(&mut self.shoe, &mut player.hands_mut()[0]);
+        for _ in 0..2 {
+            cards::hit_card(&mut self.shoe, &mut self.hand);
+            for player in self.players.iter_mut() {
+                cards::hit_card(&mut self.shoe, &mut player.hands_mut()[0]);
+            }
         }
     }
 
@@ -184,9 +206,7 @@ impl Dealer<'_> {
     /// # Arguments
     ///
     /// * `clear_table` - Clear the table at the beginning of the round
-    /// * `stand_17` - `true` if the dealer should stand on soft 17,
-    /// `false` if the dealer should hit
-    pub fn play_round(&mut self, clear_table: bool, stand_17: bool) {
+    pub fn play_round(&mut self, clear_table: bool) {
         if clear_table {
             self.clear_table();
         }
@@ -223,12 +243,16 @@ impl Dealer<'_> {
         // Get player actions
         for i in 0..self.players.len() {
             // Check if player has enough money to double down
-            let mut can_double = self.players[i].money() >= &player_bets[i];
+            let mut can_double = vec![self.players[i].money() >= &player_bets[i]];
             // Check if player cards are valid for a split and if player has enough money
-            let mut can_split = can_split(&self.players[i].hands()[0]) && can_double;
+            let mut can_split = can_split(&self.players[i].hands()[0]) && can_double[0];
 
             // Keep track of stood hands
             let mut stood = vec![false];
+
+            // Keep track of original bet
+            // Used when doubling after splitting
+            let original_bet = player_bets[i];
 
             // Active hand
             let mut hand_count = 1;
@@ -244,14 +268,18 @@ impl Dealer<'_> {
                     let action =
                         (self.callback)(DealerRequest::Play(j), Some(&self.players[i]), &self);
                     match action {
-                        PlayerAction::Hit => self.hit_card(i, j),
+                        PlayerAction::Hit => {
+                            self.hit_card(i, j);
+                            can_double[j] = false;
+                        }
                         PlayerAction::Stand => stood[j] = true,
                         PlayerAction::DoubleDown => {
-                            if can_double {
-                                *self.players[i].money_mut() -= player_bets[i];
-                                player_bets[i] *= 2;
+                            if can_double[j] {
+                                *self.players[i].money_mut() -= original_bet;
+                                player_bets[i] += original_bet;
                                 stood[j] = true;
                                 self.hit_card(i, j);
+                                can_double[j] = false;
                             } else {
                                 (self.callback)(
                                     DealerRequest::Error(PlayerActionError::UnexpectedAction(
@@ -264,10 +292,16 @@ impl Dealer<'_> {
                         }
                         PlayerAction::Split => {
                             if can_split {
-                                *self.players[i].money_mut() -= player_bets[i];
-                                player_bets[i] *= 2;
+                                *self.players[i].money_mut() -= original_bet;
+                                player_bets[i] += original_bet;
                                 self.players[i].hands_mut().push(Vec::new());
                                 stood.push(false);
+                                if self.config.double_after_split {
+                                    can_double.push(true);
+                                } else {
+                                    can_double[0] = false;
+                                    can_double.push(false);
+                                }
                                 // "Draw" card from first hand and place it into second
                                 let card = cards::draw_card(
                                     self.players[i].hands_mut().get_mut(0).unwrap(),
@@ -277,6 +311,7 @@ impl Dealer<'_> {
                                 self.hit_card(i, 0);
                                 self.hit_card(i, 1);
                                 hand_count = 2;
+                                can_split = false;
                             } else {
                                 (self.callback)(
                                     DealerRequest::Error(PlayerActionError::UnexpectedAction(
@@ -301,9 +336,6 @@ impl Dealer<'_> {
                     if get_hand_value(&self.players[i].hands()[j], true) > 21 {
                         stood[j] = true;
                     }
-
-                    can_double = false;
-                    can_split = false;
                 }
                 j += 1;
             }
@@ -317,7 +349,7 @@ impl Dealer<'_> {
                 busted = true;
                 break;
             } else if hand_value >= 17 {
-                if stand_17 {
+                if self.config.stand_soft_17 {
                     break;
                 // Check if hand is exactly 17 contains an ace
                 } else if hand_value == 17 && self.hand.iter().any(|&i| i[1] == 'A') {
@@ -362,8 +394,8 @@ impl Dealer<'_> {
                             self.players[i].money += player_bets[i];
                         } else {
                             // Pay out 3 to 2
-                            self.players[i].money +=
-                                player_bets[i] + (player_bets[i] as f32 * 1.5) as i32;
+                            self.players[i].money += player_bets[i]
+                                + (player_bets[i] as f32 * self.config.blackjack_payout) as i32;
                         }
                     } else {
                         self.players[i].money +=

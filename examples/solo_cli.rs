@@ -119,10 +119,10 @@ fn main() {
 
     let mut dealer: Dealer;
 
-    dealer = Dealer::new(shoe, &callback);
+    dealer = Dealer::new(shoe, DEFAULT_CONFIG, &callback);
     dealer.players_mut().push(player);
 
     loop {
-        dealer.play_round(true, true);
+        dealer.play_round(true);
     }
 }
