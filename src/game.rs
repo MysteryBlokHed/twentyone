@@ -63,6 +63,8 @@ pub enum PlayerActionError {
 pub struct GameConfig {
     pub stand_soft_17: bool,
     pub blackjack_payout: f32,
+    pub splitting: bool,
+    pub doubling_down: bool,
     pub double_after_split: bool,
 }
 
@@ -72,6 +74,8 @@ pub struct GameConfig {
 pub const DEFAULT_CONFIG: GameConfig = GameConfig {
     stand_soft_17: true,
     blackjack_payout: 1.5,
+    splitting: true,
+    doubling_down: true,
     double_after_split: true,
 };
 
@@ -242,10 +246,20 @@ impl Dealer<'_> {
 
         // Get player actions
         for i in 0..self.players.len() {
-            // Check if player has enough money to double down
-            let mut can_double = vec![self.players[i].money() >= &player_bets[i]];
-            // Check if player cards are valid for a split and if player has enough money
-            let mut can_split = can_split(&self.players[i].hands()[0]) && can_double[0];
+            let mut can_double: Vec<bool>;
+            let mut can_split: bool;
+            if self.config.doubling_down {
+                // Check if player has enough money to double down
+                can_double = vec![self.players[i].money() >= &player_bets[i]];
+            } else {
+                can_double = vec![false];
+            }
+            if self.config.splitting {
+                // Check if player cards are valid for a split and if player has enough money
+                can_split = crate::game::can_split(&self.players[i].hands()[0]) && can_double[0];
+            } else {
+                can_split = false;
+            }
 
             // Keep track of stood hands
             let mut stood = vec![false];
@@ -296,7 +310,7 @@ impl Dealer<'_> {
                                 player_bets[i] += original_bet;
                                 self.players[i].hands_mut().push(Vec::new());
                                 stood.push(false);
-                                if self.config.double_after_split {
+                                if self.config.double_after_split && self.config.doubling_down {
                                     can_double.push(true);
                                 } else {
                                     can_double[0] = false;
