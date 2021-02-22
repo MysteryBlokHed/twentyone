@@ -7,8 +7,7 @@
 //! and stand when it's >= 17.
 //!
 //! ```
-//! use twentyone::cards::*;
-//! use twentyone::game::*;
+//! use twentyone::prelude::*;
 //!
 //! // Callback that will be used to return player's actions such as betting or hitting
 //! fn callback(request: DealerRequest, player: Option<&Player>, dealer: &Dealer) -> PlayerAction {
@@ -84,3 +83,4 @@
 
 pub mod cards;
 pub mod game;
+pub mod prelude;

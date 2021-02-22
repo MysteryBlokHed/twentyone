@@ -45,6 +45,13 @@ add the following to your `Cargo.toml` dependencies:
 twentyone = { git = "https://github.com/MysteryBlokHed/twentyone" }
 ```
 
+To add a speific release as a dependency using a branch:
+
+```toml
+[dependencies]
+twentyone = { git = "https://github.com/MysteryBlokHed/twentyone", branch = "release/0.1.0" }
+```
+
 ### Via a local build
 
 After building this project, to add it as a dependency elsewhere,

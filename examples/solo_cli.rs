@@ -1,6 +1,5 @@
 use std::io;
-use twentyone::cards::*;
-use twentyone::game::*;
+use twentyone::prelude::*;
 
 /// Turn a card into a 2-character string
 fn card_to_printable(card: &[char; 2]) -> String {
