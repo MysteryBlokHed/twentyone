@@ -32,7 +32,7 @@ to your `Cargo.toml` dependencies:
 
 ```toml
 [dependencies]
-twentyone = "0.1"
+twentyone = "0.2"
 ```
 
 ### Via git

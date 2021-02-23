@@ -60,27 +60,27 @@ pub enum PlayerActionError {
 }
 
 /// Configure different aspects of the game
-///
-/// # Fields
-///
-/// * `stand_soft_17` - Whether the dealer should stand on soft 17 or hit
-/// * `blackjack_payout` - The multiplier for when a player gets a blackjack
-/// * `splitting` - Whether to allow splitting
-/// * `double_down` - Whether to allow doubling down
-/// * `double_after_split` - Whether to allow doubling down after splitting
-/// * `auto_new_shoe` - Whether to automatically create a new shoe when low on cards
-/// * `shoe_deck_count` - How many decks to add to the new shoe if `auto_new_shoe` is enabled
-/// * `low_cards_threshold` - How many cards must be left in a deck before DealerRequest::LowCards is called.
-///    If `auto_new_shoe` is enabled, the new shoe will be created when this number is reached. Note that the
-///    check for low cards is only run
 pub struct GameConfig {
+    /// Whether the dealer should stand on soft 17 or hit
     pub stand_soft_17: bool,
+    /// The multiplier for when a player gets a blackjack
     pub blackjack_payout: f32,
+    /// Whether to allow splitting
     pub splitting: bool,
+    /// Whether to allow doubling down
     pub doubling_down: bool,
+    /// Whether to allow doubling down after splitting
     pub double_after_split: bool,
+    /// The minimum player bet
+    pub min_bet: i32,
+    /// The maximum player bet
+    pub max_bet: i32,
+    /// Whether to automatically create a new shoe when low on cards
     pub auto_new_shoe: bool,
+    /// How many decks to add to the new shoe if `auto_new_shoe` is enabled
     pub shoe_deck_count: u8,
+    /// How many cards must be left in a deck before DealerRequest::LowCards is called.
+    /// If `auto_new_shoe` is enabled, the new shoe will be created when this number is reached.
     pub low_cards_threshold: usize,
 }
 
@@ -90,12 +90,15 @@ pub struct GameConfig {
 /// pays out blackjacks 3 to 2, and allows doubling after splitting.
 ///
 /// Automatically creates a new 6-deck shoe when 52 or less cards are remaining.
+/// Minimum bet is 1 and maximum bet is `i32::MAX` (2,147,483,647)
 pub const DEFAULT_CONFIG: GameConfig = GameConfig {
     stand_soft_17: true,
     blackjack_payout: 1.5,
     splitting: true,
     doubling_down: true,
     double_after_split: true,
+    min_bet: 1,
+    max_bet: i32::MAX,
     auto_new_shoe: true,
     shoe_deck_count: 6,
     low_cards_threshold: 52,
@@ -244,11 +247,20 @@ impl Dealer<'_> {
             loop {
                 let bet = (self.callback)(DealerRequest::Bet, Some(&self.players[i]), &self);
                 if let PlayerAction::Bet(amount) = bet {
-                    // Check if player can afford bet
+                    // Check if player can afford bet and if it is within limits
                     if self.players[i].money() >= &amount {
-                        player_bets.push(amount);
-                        *self.players[i].money_mut() -= amount;
-                        break;
+                        if self.config.min_bet <= amount && amount <= self.config.max_bet {
+                            player_bets.push(amount);
+                            *self.players[i].money_mut() -= amount;
+                            break;
+                        } else {
+                            let error = PlayerActionError::UnexpectedAction(0, bet);
+                            (self.callback)(
+                                DealerRequest::Error(error),
+                                Some(&self.players[i]),
+                                &self,
+                            );
+                        }
                     } else {
                         let error = PlayerActionError::NotEnoughMoney(0, bet);
                         (self.callback)(DealerRequest::Error(error), Some(&self.players[i]), &self);
