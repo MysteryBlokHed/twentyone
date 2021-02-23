@@ -89,6 +89,10 @@ mod tests {
                     println!("Dealer returned an error");
                     PlayerAction::None
                 }
+                DealerRequest::LowCards => {
+                    println!("Dealer low on cards, automatically creating new shoe");
+                    PlayerAction::None
+                }
             }
         }
 
