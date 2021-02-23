@@ -107,6 +107,7 @@ fn callback(request: DealerRequest, p: Option<&Player>, dealer: &Dealer) -> Play
             }
             PlayerAction::None
         }
+        _ => PlayerAction::None,
     }
 }
 

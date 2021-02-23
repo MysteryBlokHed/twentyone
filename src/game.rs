@@ -25,9 +25,14 @@ pub enum DealerRequest {
     UpCard([char; 2]),
     /// The dealer's hit card
     HitCard([char; 2]),
-    /// The dealer's hand after they have played
+    /// The dealer's hand after they have finished playing
     DealerHand(Vec<[char; 2]>),
-    /// An error with a PlayerAction
+    /// The low card threshold was hit
+    ///
+    /// If `auto_new_shoe` is disabled in the GameConfig, the creation of
+    /// a new shoe should be done when this is called
+    LowCards,
+    /// An error with a returned PlayerAction
     ///
     /// # Arguments
     ///
@@ -59,24 +64,40 @@ pub enum PlayerActionError {
 ///
 /// * `stand_soft_17` - Whether the dealer should stand on soft 17 or hit
 /// * `blackjack_payout` - The multiplier for when a player gets a blackjack
+/// * `splitting` - Whether to allow splitting
+/// * `double_down` - Whether to allow doubling down
 /// * `double_after_split` - Whether to allow doubling down after splitting
+/// * `auto_new_shoe` - Whether to automatically create a new shoe when low on cards
+/// * `shoe_deck_count` - How many decks to add to the new shoe if `auto_new_shoe` is enabled
+/// * `low_cards_threshold` - How many cards must be left in a deck before DealerRequest::LowCards is called.
+///    If `auto_new_shoe` is enabled, the new shoe will be created when this number is reached. Note that the
+///    check for low cards is only run
 pub struct GameConfig {
     pub stand_soft_17: bool,
     pub blackjack_payout: f32,
     pub splitting: bool,
     pub doubling_down: bool,
     pub double_after_split: bool,
+    pub auto_new_shoe: bool,
+    pub shoe_deck_count: u8,
+    pub low_cards_threshold: usize,
 }
 
 /// A default configuration for game settings.
 ///
-/// Stands on soft 17, pays out blackjacks 3 to 2, and allows doubling after splitting.
+/// Allows doubling down and splitting, stands on soft 17,
+/// pays out blackjacks 3 to 2, and allows doubling after splitting.
+///
+/// Automatically creates a new 6-deck shoe when 52 or less cards are remaining.
 pub const DEFAULT_CONFIG: GameConfig = GameConfig {
     stand_soft_17: true,
     blackjack_payout: 1.5,
     splitting: true,
     doubling_down: true,
     double_after_split: true,
+    auto_new_shoe: true,
+    shoe_deck_count: 6,
+    low_cards_threshold: 52,
 };
 
 /// Describes a blackjack dealer
@@ -275,6 +296,16 @@ impl Dealer<'_> {
             // Using a loop and incrementing j manually because for loops would not recheck
             // length of player.hands() after a split
             loop {
+                // Check for low cards
+                if self.shoe.len() <= self.config.low_cards_threshold {
+                    (self.callback)(DealerRequest::LowCards, None, &self);
+                    // Create a new shoe if the option is enabled
+                    if self.config.auto_new_shoe {
+                        self.shoe = cards::create_shoe(self.config.shoe_deck_count);
+                        cards::shuffle_deck(&mut self.shoe);
+                    }
+                }
+
                 if j >= hand_count {
                     break;
                 }
