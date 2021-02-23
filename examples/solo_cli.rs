@@ -1,4 +1,5 @@
 use std::io;
+use twentyone::game::get_hand_value;
 use twentyone::prelude::*;
 
 /// Turn a card into a 2-character string

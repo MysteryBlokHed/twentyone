@@ -1,3 +1,4 @@
+//! Game-related functions and structures, such as the dealer or hand value checking
 use crate::cards;
 
 /// Actions a player can perform

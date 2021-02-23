@@ -7,6 +7,7 @@
 //! and stand when it's >= 17.
 //!
 //! ```
+//! use twentyone::game::get_hand_value;
 //! use twentyone::prelude::*;
 //!
 //! // Callback that will be used to return player's actions such as betting or hitting
@@ -79,6 +80,8 @@
 //! }
 //!
 //! ```
+//!
+//! More examples are available in the examples folder of the repository.
 #![crate_name = "twentyone"]
 
 pub mod cards;

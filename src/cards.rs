@@ -1,3 +1,4 @@
+//! Card-related functions, such as deck creation and shuffling
 use rand::seq::SliceRandom;
 
 /// Returns a 52-card deck in order
