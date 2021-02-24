@@ -10,8 +10,10 @@ repository = "https://github.com/MysteryBlokHed/twentyone"
 license = "Apache-2.0"
 keywords = ["library", "game", "blackjack", "gambling", "casino"]
 categories = ["game-engines", "games"]
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+include = [
+    "**/*.rs",
+    "Cargo.toml",
+]
 
 [dependencies]
 rand = "0.8"
