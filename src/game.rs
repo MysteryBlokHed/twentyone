@@ -28,10 +28,7 @@ pub enum DealerRequest {
     HitCard([char; 2]),
     /// The dealer's hand after they have finished playing
     DealerHand(Vec<[char; 2]>),
-    /// The low card threshold was hit
-    ///
-    /// If `auto_new_shoe` is disabled in the GameConfig, the creation of
-    /// a new shoe should be done when this is called
+    /// The low card threshold was hit and a new shoe was created
     LowCards,
     /// An error with a returned PlayerAction
     ///
@@ -75,8 +72,6 @@ pub struct GameConfig {
     pub min_bet: i32,
     /// The maximum player bet
     pub max_bet: i32,
-    /// Whether to automatically create a new shoe when low on cards
-    pub auto_new_shoe: bool,
     /// How many decks to add to the new shoe if `auto_new_shoe` is enabled
     pub shoe_deck_count: u8,
     /// How many cards must be left in a deck before DealerRequest::LowCards is called.
@@ -89,7 +84,7 @@ pub struct GameConfig {
 /// Allows doubling down and splitting, stands on soft 17,
 /// pays out blackjacks 3 to 2, and allows doubling after splitting.
 ///
-/// Automatically creates a new 6-deck shoe when 52 or less cards are remaining.
+/// Creates a new 6-deck shoe when 52 or less cards are remaining.
 /// Minimum bet is 1 and maximum bet is `i32::MAX` (2,147,483,647)
 pub const DEFAULT_CONFIG: GameConfig = GameConfig {
     stand_soft_17: true,
@@ -99,7 +94,6 @@ pub const DEFAULT_CONFIG: GameConfig = GameConfig {
     double_after_split: true,
     min_bet: 1,
     max_bet: i32::MAX,
-    auto_new_shoe: true,
     shoe_deck_count: 6,
     low_cards_threshold: 52,
 };
@@ -313,10 +307,8 @@ impl Dealer<'_> {
                 if self.shoe.len() <= self.config.low_cards_threshold {
                     (self.callback)(DealerRequest::LowCards, None, &self);
                     // Create a new shoe if the option is enabled
-                    if self.config.auto_new_shoe {
-                        self.shoe = cards::create_shoe(self.config.shoe_deck_count);
-                        cards::shuffle_deck(&mut self.shoe);
-                    }
+                    self.shoe = cards::create_shoe(self.config.shoe_deck_count);
+                    cards::shuffle_deck(&mut self.shoe);
                 }
 
                 if j >= hand_count {
